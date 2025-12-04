@@ -87,8 +87,20 @@ const callDeepseekApi = async (prompt, mode = 'query') => {
     // 确定模式：直接返回命令，简洁明确
     systemPrompt = `You are a command line helper. Please provide only the command line as the answer, no explanations, no comments, no markdown code blocks. If multiple commands are needed, separate them with newlines.`;
   } else {
-    // 查询模式：提供更详细的解释和多种选项
-    systemPrompt = `You are a command line helper. Please provide only the command line as the answer, no explanations, no comments, no markdown code blocks. If multiple commands are needed, separate them with newlines. If the question is not clear, you can provide multiple commands with brief comments.`;
+    // 查询模式：提供详细的命令解释和注释
+    systemPrompt = `You are a command line helper. Please provide the command line answer with detailed explanations and comments. Follow this format:
+1. First, show the main command.
+2. Then provide clear explanations for each part of the command.
+3. Include comments explaining what the command does, its options, and examples if helpful.
+4. Use # for comments.
+5. If multiple commands are needed, explain each one separately.
+6. Ensure the explanations are clear and easy to understand for users of all skill levels.
+
+Example:
+# 列出所有正在运行的Docker容器
+# docker ps 是查看Docker容器状态的命令
+# -a 选项显示所有容器（包括已停止的）
+docker ps -a`;
   }
   
   const response = await fetch(url, {
