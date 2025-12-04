@@ -2,13 +2,11 @@ import { useState, useEffect } from 'react'
 
 function App() {
   const [question, setQuestion] = useState('')
-  const [environment, setEnvironment] = useState('')
+  const [environment, setEnvironment] = useState('Ubuntu 22.04, bash')
   const [command, setCommand] = useState('')
   const [history, setHistory] = useState([])
-  const [leaderboard, setLeaderboard] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [showCopyHint, setShowCopyHint] = useState(false)
-  const [mode, setMode] = useState('query') // query: 查询模式, certain: 确定模式
 
   // 获取历史记录
   const fetchHistory = async () => {
@@ -21,20 +19,8 @@ function App() {
     }
   }
 
-  // 获取排行榜
-  const fetchLeaderboard = async () => {
-    try {
-      const response = await fetch('http://localhost:3001/api/leaderboard')
-      const data = await response.json()
-      setLeaderboard(data)
-    } catch (error) {
-      console.error('获取排行榜失败:', error)
-    }
-  }
-
   useEffect(() => {
     fetchHistory()
-    fetchLeaderboard()
   }, [])
 
   // 查询命令
@@ -49,12 +35,11 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ question, environment, mode }),
+        body: JSON.stringify({ question, environment }),
       })
       const data = await response.json()
       setCommand(data.answer)
       fetchHistory() // 更新历史记录
-      fetchLeaderboard() // 更新排行榜
     } catch (error) {
       console.error('查询命令失败:', error)
       setCommand('错误：获取命令失败，请重试。')
@@ -109,48 +94,16 @@ function App() {
             </div>
             <div>
               <label htmlFor="environment" className="block text-sm font-medium text-gray-300 mb-2">
-                环境（可选）
+                环境（默认：Ubuntu 22.04, bash）
               </label>
               <input
                 type="text"
                 id="environment"
                 value={environment}
                 onChange={(e) => setEnvironment(e.target.value)}
-                placeholder="例如：Ubuntu 22.04, zsh"
+                placeholder="例如：Windows 10, PowerShell 或 macOS, zsh"
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                对话模式
-              </label>
-              <div className="flex space-x-4">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="mode"
-                    value="query"
-                    checked={mode === 'query'}
-                    onChange={(e) => setMode(e.target.value)}
-                    className="text-blue-500 focus:ring-blue-500 border-gray-600"
-                  />
-                  <span className="text-gray-300">查询模式</span>
-                </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="mode"
-                    value="certain"
-                    checked={mode === 'certain'}
-                    onChange={(e) => setMode(e.target.value)}
-                    className="text-blue-500 focus:ring-blue-500 border-gray-600"
-                  />
-                  <span className="text-gray-300">确定模式</span>
-                </label>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                {mode === 'query' ? '适合不确定的命令查询，提供详细解释和选项' : '适合确定的命令请求，直接返回简洁命令'}
-              </p>
             </div>
             <button
               type="submit"
@@ -188,7 +141,7 @@ function App() {
         )}
 
         {/* 历史记录区域 */}
-        <section className="mb-12 bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700">
+        <section className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700">
           <h2 className="text-xl font-semibold text-blue-400 mb-4">历史记录</h2>
           {history.length === 0 ? (
             <p className="text-gray-400 text-center py-8">暂无历史记录。提出您的第一个问题吧！</p>
@@ -202,9 +155,6 @@ function App() {
                       {item.environment && (
                         <p className="text-xs text-gray-400 mt-1">{item.environment}</p>
                       )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        模式：{item.mode === 'query' ? '查询模式' : '确定模式'}
-                      </p>
                     </div>
                     <p className="text-xs text-gray-500">
                       {new Date(item.timestamp).toLocaleString()}
@@ -221,38 +171,6 @@ function App() {
                       复制
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* 排行榜区域 */}
-        <section className="mb-12 bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700">
-          <h2 className="text-xl font-semibold text-blue-400 mb-4">命令排行榜</h2>
-          {leaderboard.length === 0 ? (
-            <p className="text-gray-400 text-center py-8">暂无排行榜数据。使用命令后将自动更新！</p>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-              {leaderboard.map((item, index) => (
-                <div key={index} className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center mb-2">
-                      <span className="inline-block w-6 h-6 bg-blue-600 rounded-full text-center text-xs font-bold mr-3">
-                        {index + 1}
-                      </span>
-                      <span className="text-gray-400 text-sm mr-2">使用次数：{item.usage_count}</span>
-                    </div>
-                    <pre className="bg-gray-900 rounded-lg p-3 overflow-x-auto text-gray-300 font-mono text-xs whitespace-pre-wrap">
-                      {item.command}
-                    </pre>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(item.command)}
-                    className="bg-gray-600 hover:bg-gray-500 text-xs font-medium px-3 py-1 rounded-lg transition-colors duration-200 ml-3 shrink-0"
-                  >
-                    复制
-                  </button>
                 </div>
               ))}
             </div>
