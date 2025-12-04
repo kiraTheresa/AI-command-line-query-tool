@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 
 function App() {
   const [question, setQuestion] = useState('')
-  const [environment, setEnvironment] = useState('')
+  const [environment, setEnvironment] = useState('Ubuntu 22.04, bash')
   const [command, setCommand] = useState('')
   const [history, setHistory] = useState([])
   const [isLoading, setIsLoading] = useState(false)
@@ -94,14 +94,14 @@ function App() {
             </div>
             <div>
               <label htmlFor="environment" className="block text-sm font-medium text-gray-300 mb-2">
-                环境（可选）
+                环境（默认：Ubuntu 22.04, bash）
               </label>
               <input
                 type="text"
                 id="environment"
                 value={environment}
                 onChange={(e) => setEnvironment(e.target.value)}
-                placeholder="例如：Ubuntu 22.04, zsh"
+                placeholder="例如：Windows 10, PowerShell 或 macOS, zsh"
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400"
               />
             </div>
