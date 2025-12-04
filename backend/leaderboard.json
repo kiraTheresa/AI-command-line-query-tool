@@ -1,0 +1,26 @@
+[
+  {
+    "command": "docker ps",
+    "usage_count": 2
+  },
+  {
+    "command": "docker compose ps",
+    "usage_count": 1
+  },
+  {
+    "command": "rm [文件或目录路径]",
+    "usage_count": 1
+  },
+  {
+    "command": "rm <file>\nrm -r <directory>",
+    "usage_count": 1
+  },
+  {
+    "command": "git subtree add --prefix=<directory> <repository> <branch>\ngit subtree pull --prefix=<directory> <repository> <branch>\ngit subtree push --prefix=<directory> <repository> <branch>",
+    "usage_count": 1
+  },
+  {
+    "command": "git subtree add --prefix=<subdirectory> <repository> <branch> --squash",
+    "usage_count": 1
+  }
+]
