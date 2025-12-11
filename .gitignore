@@ -8,3 +8,4 @@
 .env
 
 backend/history.json
+backend/leaderboard.json

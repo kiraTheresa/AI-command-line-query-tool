@@ -77,8 +77,8 @@ const updateLeaderboard = (command) => {
   return leaderboard;
 };
 
-// 调用 Deepseek API
-const callDeepseekApi = async (prompt, mode = 'query') => {
+// 调用 Deepseek API (流式)
+const callDeepseekApi = async (prompt, mode = 'query', res = null) => {
   const url = 'https://api.deepseek.com/v1/chat/completions';
   
   // 根据模式调整系统提示词
@@ -122,7 +122,8 @@ docker ps -a`;
         }
       ],
       temperature: 0.7,
-      max_tokens: 1000
+      max_tokens: 1000,
+      stream: true  // 启用流式响应
     })
   });
   
@@ -130,13 +131,71 @@ docker ps -a`;
     throw new Error(`Deepseek API error: ${response.status}`);
   }
   
-  const data = await response.json();
-  return data.choices[0].message.content.trim();
+  // 如果提供了res参数，使用流式响应
+  if (res) {
+    // 设置响应头为SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    
+    let fullAnswer = '';
+    
+    // 处理流式响应
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        // 分割SSE事件
+        const events = chunk.split('\n\n');
+        
+        for (const event of events) {
+          if (!event.trim() || event.startsWith(':')) continue;
+          
+          try {
+            // 提取data字段
+            const dataLine = event.split('\n').find(line => line.startsWith('data: '));
+            if (dataLine) {
+              const dataStr = dataLine.replace('data: ', '');
+              if (dataStr === '[DONE]') {
+                // 流式结束
+                res.write(`event: done\ndata: ${JSON.stringify({ fullAnswer })}\n\n`);
+                return fullAnswer;
+              }
+              
+              const data = JSON.parse(dataStr);
+              const content = data.choices[0]?.delta?.content;
+              if (content) {
+                fullAnswer += content;
+                // 发送数据到客户端
+                res.write(`event: message\ndata: ${JSON.stringify({ content })}\n\n`);
+              }
+            }
+          } catch (parseError) {
+            console.error('Error parsing SSE event:', parseError);
+            continue;
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    
+    return fullAnswer;
+  } else {
+    // 非流式响应，兼容原有逻辑
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
+  }
 };
 
 // API 路由
 
-// 查询命令
+// 查询命令 (支持流式)
 app.post('/api/query', async (req, res) => {
   const { question, environment, mode = 'query' } = req.body;
   
@@ -151,30 +210,37 @@ app.post('/api/query', async (req, res) => {
       prompt += `\nEnvironment: ${environment}`;
     }
     
-    // 调用 AI API
-    const answer = await callDeepseekApi(prompt, mode);
+    // 调用 AI API (流式)
+    const fullAnswer = await callDeepseekApi(prompt, mode, res);
     
-    // 更新排行榜
-    updateLeaderboard(answer);
+    // 流式响应结束后，更新排行榜和历史记录
+    if (fullAnswer) {
+      // 更新排行榜
+      updateLeaderboard(fullAnswer);
+      
+      // 保存到历史记录
+      const history = readHistory();
+      const newRecord = {
+        id: generateId(),
+        question,
+        environment: environment || '',
+        answer: fullAnswer,
+        mode,
+        timestamp: new Date().toISOString()
+      };
+      history.push(newRecord);
+      writeHistory(history);
+    }
     
-    // 保存到历史记录
-    const history = readHistory();
-    const newRecord = {
-      id: generateId(),
-      question,
-      environment: environment || '',
-      answer,
-      mode,
-      timestamp: new Date().toISOString()
-    };
-    history.push(newRecord);
-    writeHistory(history);
-    
-    // 返回结果
-    res.json(newRecord);
+    res.end();
   } catch (error) {
     console.error('Error processing query:', error);
-    res.status(500).json({ error: 'Failed to get command. Please try again.' });
+    // 流式响应出错时，发送错误事件
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'text/event-stream' });
+    }
+    res.write(`event: error\ndata: ${JSON.stringify({ error: 'Failed to get command. Please try again.' })}\n\n`);
+    res.end();
   }
 });
 

@@ -37,12 +37,14 @@ function App() {
     fetchLeaderboard()
   }, [])
 
-  // 查询命令
+  // 查询命令（支持流式）
   const handleQuery = async (e) => {
     e.preventDefault()
     if (!question.trim()) return
 
     setIsLoading(true)
+    setCommand('') // 清空之前的命令
+    
     try {
       const response = await fetch('http://localhost:3001/api/query', {
         method: 'POST',
@@ -51,10 +53,55 @@ function App() {
         },
         body: JSON.stringify({ question, environment, mode }),
       })
-      const data = await response.json()
-      setCommand(data.answer)
-      fetchHistory() // 更新历史记录
-      fetchLeaderboard() // 更新排行榜
+
+      if (!response.ok) {
+        throw new Error('网络请求失败')
+      }
+
+      // 处理流式响应
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        
+        // 处理所有完整的SSE事件
+        let eventIndex
+        while ((eventIndex = buffer.indexOf('\n\n')) !== -1) {
+          const event = buffer.slice(0, eventIndex)
+          buffer = buffer.slice(eventIndex + 2)
+          
+          if (!event.trim() || event.startsWith(':')) continue
+          
+          try {
+            // 提取data字段
+            const dataLine = event.split('\n').find(line => line.startsWith('data: '))
+            if (dataLine) {
+              const dataStr = dataLine.replace('data: ', '')
+              const data = JSON.parse(dataStr)
+              
+              if (data.content) {
+                // 实时更新命令内容
+                setCommand(prev => prev + data.content)
+              } else if (data.error) {
+                // 处理错误
+                setCommand(data.error)
+              } else if (data.fullAnswer) {
+                // 流式结束，更新历史记录和排行榜
+                fetchHistory()
+                fetchLeaderboard()
+              }
+            }
+          } catch (parseError) {
+            console.error('解析SSE事件失败:', parseError)
+            continue
+          }
+        }
+      }
     } catch (error) {
       console.error('查询命令失败:', error)
       setCommand('错误：获取命令失败，请重试。')
